@@ -7,10 +7,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.function.Function;
 
-import org.jsoup.Connection.Response;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -20,6 +20,8 @@ import com.google.common.collect.ImmutableList;
 
 public class ItemRipper {
 
+  private static final int N_ATTEMPTS = 3;
+  
   private final ItemRipperConfiguration config;
 
   public ItemRipper(ItemRipperConfiguration config) {
@@ -107,12 +109,12 @@ public class ItemRipper {
   
   private void download(ItemInfo itemInfo) {
     StringBuilder sb = new StringBuilder();
-    sb.append(itemInfo.getTitle());
+    sb.append(encodeFileName(itemInfo.getTitle()));
     if (itemInfo.getColor() != null) {
-      sb.append(", ").append(itemInfo.getColor().replace('/', '+'));
+      sb.append(", ").append(encodeFileName(itemInfo.getColor()));
     }
     if (itemInfo.getFabric() != null) {
-      sb.append(", ").append(itemInfo.getFabric().replace('/', '+'));
+      sb.append(", ").append(encodeFileName(itemInfo.getFabric()));
     }
     String folderName = sb.toString().trim();
     
@@ -124,11 +126,21 @@ public class ItemRipper {
       .build();
     
     for (String imageUrl : imageUrls) {
-      Response resultImageResponse;
-      try {
-        resultImageResponse = Jsoup.connect(imageUrl).ignoreContentType(true).execute();
-      } catch (IOException e1) {
-        System.err.println("Can't read " + imageUrl);
+      byte[] resultImageResponse = null;
+      for (int i = 0; i < N_ATTEMPTS; i++) {
+        try {
+          resultImageResponse = Jsoup
+              .connect(imageUrl)
+              .ignoreContentType(true)
+              .execute()
+              .bodyAsBytes();
+        } catch (IOException e1) {
+          System.out.println("Can't read " + imageUrl);
+          continue;
+        }
+      }
+      if (resultImageResponse == null) {
+        System.err.println("Failed to read " + imageUrl);
         continue;
       }
       String fileName = getFileName(imageUrl);
@@ -140,11 +152,15 @@ public class ItemRipper {
       }
       Path targetFile = Paths.get(config.getTargetFolder(), folderName, fileName);
       try {
-        Files.copy(new ByteArrayInputStream(resultImageResponse.bodyAsBytes()), targetFile);
+        Files.copy(new ByteArrayInputStream(resultImageResponse), targetFile, StandardCopyOption.REPLACE_EXISTING);
       } catch (IOException e) {
         System.err.println("Can't copy " + imageUrl);
       }
     }
+  }
+
+  private String encodeFileName(String name) {
+    return name.replace('/', '+');
   }
 
   private String getFileName(String url) {

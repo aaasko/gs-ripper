@@ -24,7 +24,8 @@ public class Main {
     ImmutableList<String> colorSelectors = ImmutableList.of(
         ".colorSelection-name",
         ".productInfoRow-subtitle:contains(Colour) + p",
-        ".productInfoRow-subtitle:contains(Color) + p"
+        ".productInfoRow-subtitle:contains(Color) + p",
+        ".productInfoRow-title:contains(Fabric) ~ .productInfoRow-subtitle:nth-of-type(2)"
     );
     String fabricNameSelector =
         ".productInfoRow-title:contains(Fabric) + .productInfoRow-subtitle";
