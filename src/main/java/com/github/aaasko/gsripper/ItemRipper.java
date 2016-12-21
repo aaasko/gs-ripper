@@ -2,12 +2,13 @@ package com.github.aaasko.gsripper;
 
 import static java.util.stream.Collectors.toList;
 
-import java.io.ByteArrayInputStream;
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.function.Function;
 
@@ -126,37 +127,46 @@ public class ItemRipper {
       .build();
     
     for (String imageUrl : imageUrls) {
-      byte[] resultImageResponse = null;
+      Path targetFile = getTargetFile(folderName, imageUrl);
+      
+      if (Files.exists(targetFile)) {
+        continue;
+      }
+      
+      InputStream resultImageResponse = null;
+      
       for (int i = 0; i < N_ATTEMPTS; i++) {
         try {
-          resultImageResponse = Jsoup
-              .connect(imageUrl)
-              .ignoreContentType(true)
-              .execute()
-              .bodyAsBytes();
+          resultImageResponse = new BufferedInputStream(new URL(imageUrl).openStream());
         } catch (IOException e1) {
           System.out.println("Can't read " + imageUrl);
           continue;
         }
       }
+      
       if (resultImageResponse == null) {
         System.err.println("Failed to read " + imageUrl);
         continue;
       }
-      String fileName = getFileName(imageUrl);
-      Path targetFolder = Paths.get(config.getTargetFolder(), folderName);
+      
       try {
-        Files.createDirectories(targetFolder);
-      } catch (IOException e1) {
-        System.err.println("Can't create folder " + targetFolder);
-      }
-      Path targetFile = Paths.get(config.getTargetFolder(), folderName, fileName);
-      try {
-        Files.copy(new ByteArrayInputStream(resultImageResponse), targetFile, StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(resultImageResponse, targetFile);
       } catch (IOException e) {
         System.err.println("Can't copy " + imageUrl);
       }
     }
+  }
+  
+  private Path getTargetFile(String folderName, String imageUrl) {
+    String fileName = getFileName(imageUrl);
+    Path targetFolder = Paths.get(config.getTargetFolder(), folderName);
+    try {
+      Files.createDirectories(targetFolder);
+    } catch (IOException e1) {
+      System.err.println("Can't create folder " + targetFolder);
+    }
+    
+    return Paths.get(config.getTargetFolder(), folderName, fileName);
   }
 
   private String encodeFileName(String name) {
