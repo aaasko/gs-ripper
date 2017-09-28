@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.function.Function;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -40,7 +39,7 @@ public class ItemRipper {
       return;
     }
     
-    String title = doc.select(config.getTitleSelector()).text();
+    String title = doc.select(config.getTitleSelector()).first().text();
     String color = "";
     for (String colorSelector : config.getColorSelectors()) {
       color = doc.select(colorSelector).text();
@@ -51,13 +50,11 @@ public class ItemRipper {
     String fabric = doc.select(config.getFabricNameSelector()).text();
     List<String> mainImages = getMainImagesSources(
       doc,
-      config.getMainImagesSelector(),
-      config.getMainImageSrcTransformer()
+      config.getMainImageLinksSelector()
     );
     List<String> productInfoImages = getProductInfoImagesSources(
       doc,
-      config.getProductInfoImagesSelector(),
-      config.getProductInfoImageTransformer()
+      config.getProductInfoImagesSelector()
     );
     
     ItemInfo itemInfo = new ItemInfo(
@@ -72,32 +69,30 @@ public class ItemRipper {
 
   private List<String> getMainImagesSources(
       Document doc,
-      String selector,
-      Function<String, String> transformer) {
+      String selector
+  ) {
     return doc
       .select(selector)
       .stream()
-      .map(this::getSrc)
+      .map(this::getDataImageLarge)
       .map(this::fixGoogleStyleUrl)
-      .map(transformer::apply)
       .collect(toList());
   }
   
   private List<String> getProductInfoImagesSources(
       Document doc,
-      String selector,
-      Function<String, String> transformer) {
+      String selector
+  ) {
     return doc
       .select(selector)
       .stream()
       .map(this::getDataSrc)
       .map(this::fixGoogleStyleUrl)
-      .map(transformer::apply)
       .collect(toList());
   }
   
-  private String getSrc(Element e) {
-    return e.attr("src");
+  private String getDataImageLarge(Element e) {
+    return e.attr("data-image-large");
   }
   
   private String getDataSrc(Element e) {
