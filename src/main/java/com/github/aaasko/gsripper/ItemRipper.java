@@ -3,13 +3,17 @@ package com.github.aaasko.gsripper;
 import static java.util.stream.Collectors.toList;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -64,7 +68,21 @@ public class ItemRipper {
         mainImages,
         productInfoImages
     );
-    download(itemInfo);
+    String folderName = formFolderName(itemInfo);
+    createFileWithLink(url, folderName);
+    downloadImages(itemInfo, folderName);
+  }
+
+  private void createFileWithLink(String url, String folderName) {
+    Path linkFile = formTargetFile(folderName, "link.txt");
+    
+    if (!Files.exists(linkFile)) {
+      try {
+        Files.copy(new ByteArrayInputStream(url.getBytes(StandardCharsets.UTF_8)), linkFile);
+      } catch (IOException e) {
+        System.err.println("Failed to write link.txt to " + folderName);
+      }
+    }
   }
 
   private List<String> getMainImagesSources(
@@ -103,17 +121,7 @@ public class ItemRipper {
     return url.startsWith("//") ? "http:" + url : url;
   }
   
-  private void download(ItemInfo itemInfo) {
-    StringBuilder sb = new StringBuilder();
-    sb.append(encodeFileName(itemInfo.getTitle()));
-    if (itemInfo.getColor() != null) {
-      sb.append(", ").append(encodeFileName(itemInfo.getColor()));
-    }
-    if (itemInfo.getFabric() != null) {
-      sb.append(", ").append(encodeFileName(itemInfo.getFabric()));
-    }
-    String folderName = sb.toString().trim();
-    
+  private void downloadImages(ItemInfo itemInfo, String folderName) {
     System.out.println(folderName);
     
     List<String> imageUrls = ImmutableList.<String>builder()
@@ -121,8 +129,27 @@ public class ItemRipper {
       .addAll(itemInfo.getProductInfoImages())
       .build();
     
+    downloadImages(imageUrls, folderName);
+  }
+  
+  private String formFolderName(ItemInfo itemInfo) {
+    List<String> folderNameParts = new ArrayList<>();
+    folderNameParts.add(itemInfo.getTitle());
+    
+    if (itemInfo.getColor() != null) {
+      folderNameParts.add(itemInfo.getColor());
+    }
+    
+    if (itemInfo.getFabric() != null) {
+      folderNameParts.add(encodeFileName(itemInfo.getFabric()));
+    }
+    
+    return folderNameParts.stream().map(this::encodeFileName).collect(Collectors.joining(", ")).trim();
+  }
+  
+  private void downloadImages(List<String> imageUrls, String folderName) {
     for (String imageUrl : imageUrls) {
-      Path targetFile = getTargetFile(folderName, imageUrl);
+      Path targetFile = formImageTargetFile(folderName, imageUrl);
       
       if (Files.exists(targetFile)) {
         continue;
@@ -152,8 +179,11 @@ public class ItemRipper {
     }
   }
   
-  private Path getTargetFile(String folderName, String imageUrl) {
-    String fileName = getFileName(imageUrl);
+  private Path formImageTargetFile(String folderName, String imageUrl) {
+    return formTargetFile(folderName, getFileName(imageUrl));
+  }
+
+  private Path formTargetFile(String folderName, String fileName) {
     Path targetFolder = Paths.get(config.getTargetFolder(), folderName);
     try {
       Files.createDirectories(targetFolder);
